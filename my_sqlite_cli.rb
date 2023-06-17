@@ -1,8 +1,8 @@
 require_relative 'my_sqlite_request'
 
-request = MySqliteRequest.new
+# request = MySqliteRequest.new
 
-request.from('nba_player_data.csv')
-        .select(['name', 'position'])
-        .where('name', 'Alaa Abdelnaby')
-        .run
+# request.from('nba_player_data.csv')
+#         .select(['name', 'position'])
+#         .where('name', 'Alaa Abdelnaby')
+#         .run

@@ -5,12 +5,12 @@ require 'csv'
 class MySqliteRequest
     def initialize
 
-        file_path = 'C:\Users\lgres\Downloads\nba_player_data.csv'
-        CSV.foreach(file_path) do |row|
-            puts row.inspect
-        end
+        # file_path = 'C:\Users\lgres\Downloads\nba_player_data.csv'
+        # CSV.foreach(file_path) do |row|
+        #     puts row.inspect
+        # end
 
-        CSV.read("nba_player_data.csv")
+        #CSV.read("nba_player_data.csv")
         @table_name = nil;
         @select_columns = [];
         @where_conditions = [];
@@ -21,7 +21,7 @@ class MySqliteRequest
     end
 
     def from(table_name)
-        @table_name = CSV.read('nba_player_data.csv', headers: true);
+        @table_name = CSV.read(table_name, headers: true);
         self;
     end
 
@@ -31,8 +31,9 @@ class MySqliteRequest
     end
 
     def where(column_name, criteria)
-        condition = "#{column_name} = '#{criteria}'";
-        @where_condition << condition;
+        condition = "#{column_name} = '#{criteria}'"
+        @query[:where] ||= [];
+        @query[:where].push(condition)
         self;
     end
 
