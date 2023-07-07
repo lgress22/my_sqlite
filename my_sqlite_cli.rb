@@ -1,13 +1,14 @@
 require 'readline'
+require 'csv'
 require_relative 'my_sqlite_request'
 
-class MySqliteCLI
+class MyCSVCLI
   def initialize
     @request = MySqliteRequest.new
   end
 
   def run
-    puts "Welcome to MySqlite CLI!"
+    puts "Welcome to MyCSV CLI!"
 
     loop do
       line = Readline.readline('> ', true)
@@ -23,9 +24,9 @@ class MySqliteCLI
     command, *args = line.split
     case command
     when 'from'
-      table_name = args[0]
-      @request.from(table_name)
-      puts "FROM: #{table_name}"
+      file_name = args[0]
+      @request.from(file_name)
+      puts "FROM: #{file_name}"
     when 'select'
       columns = args
       @request.select(*columns)
@@ -34,10 +35,6 @@ class MySqliteCLI
       column_name, criteria = args
       @request.where(column_name, criteria)
       puts "WHERE: #{column_name} = '#{criteria}'"
-    when 'join'
-      column_a, filename_b, column_b = args
-      @request.join(column_a, filename_b, column_b)
-      puts "JOIN: #{column_a} = #{filename_b}.#{column_b}"
     when 'order'
       order, column_name = args
       @request.order(order, column_name)
@@ -46,10 +43,11 @@ class MySqliteCLI
       result = @request.run
       puts "Query executed. Result: #{result}"
     else
-      puts "Invalid command: #{command}"
-    end
-  end
-end
+      puts "Invalid command: #{
 
-cli = MySqliteCLI.new
-cli.run
+
+ 
+
+# Create an instance of MyCSVCLI and run the CLI
+ cli = MyCSVCLI.new
+ cli.run

@@ -1,52 +1,55 @@
 require 'csv'
 
 class MySqliteRequest
-  def initialize
-    # db = SQLite3::Database.new("database.db")
-    @table_name = nil
-    @select_columns = []
-    @where_conditions = []
-    @join_table = nil
-    @join_condition = nil
-    @order = nil
-    @insert_data = nil
+    def initialize
+        @table_name = nil
+        @select_columns = []
+        @where_conditions = []
+        @join_table = nil
+        @join_condition = nil
+        @order = nil
+        @insert_data = nil
+        @conditions = {}
+    end
     
-  end
 
-#   def create_table
-#     db.execute("CREATE TABLE IF NOT EXISTS test (
-#         id INTEGER PRIMARY KEY AUTOINCREMENT,
-#         Player TEXT,
-#         Height INT,
-#         Weight INT,
-#         Collage TEXT,
-#         Born INT,
-#         Birth_city TEXT,
-#         Birth_state TEXT)")
-#   end
+    def self.from(table_name)
+        new.from(table_name)
+    end
+    
 
-  def from(table_name)
-    @table_name = table_name
+    def from(table_name)
+        @table_name = table_name
+        self
+    end
+    
+
+    def insert(table_name)
+        @table_name = table_name
+        self
+    end
+  
+    def self.insert(table_name)
+        new.insert(table_name)
+    end
+  
+
+    def select(*column_names)
+        @select_columns = column_names.flatten
+        self
+    end
+
+
+  def where(column_name, criteria)
+    @where_conditions << { column_name: column_name, criteria: criteria }
     self
   end
-
-  def self.from(table_name)
-    new.from(table_name)
-  end
-
-  def select(*column_names)
-    @select_columns = column_names.flatten
-    self
-  end
-
-  def where(*conditions)
-    @where_conditions = conditions.flatten
-    self
-  end
+  
+  
 
   def join(column_a, table_b, column_b)
     @join_table = table_b
-    @join_condition = "#{@table_name}.#{column_a} = #{@join_table}.#{column_b}"
+    @join_condition = { column_a: column_a, table_b: table_b, column_b: column_b }
     self
   end
 
@@ -55,54 +58,66 @@ class MySqliteRequest
     self
   end
 
-  def insert(table_name)
-    @table_name = table_name
-    self
-  end
-
-  def self.insert(table_name)
-    new.insert(table_name)
-  end
-
   def values(data)
     @insert_data = data
     self
   end
 
-#   def generate_conditions
-#     conditions = []
-#     conditions << "WHERE " + @where_conditions.join(' AND ') unless @where_conditions.empty?
-#     conditions << "JOIN #{@join_table} ON #{@join_condition}" if @join_table && @join_condition
-#     conditions.join(' ')
-#   end  
-
-   def run
+  def run
     result = []
-
-    CSV.foreach(@table_name, headers: true) do |row|
-        if @where_conditions.empty? || evaluate_conditions(row)
-          result_row = {}
-          @select_columns.each { |column| result_row[column] = row[column] }
-          result << result_row
+  
+    database_data = CSV.read('database.csv', headers: true)
+    test_data = CSV.read('test.csv', headers: true)
+  
+    database_columns = @select_columns.select { |column| column.start_with?('database.') }.map { |column| column.split('.')[1] }
+    test_columns = @select_columns.select { |column| column.start_with?('test.') }.map { |column| column.split('.')[1] }
+  
+    test_data.each do |test_row|
+      join_rows = database_data.select { |database_row| database_row[@join_condition[:column_a]] == test_row[@join_condition[:column_b]] }
+      join_rows.each do |database_row|
+        result_row = {}
+        database_columns.each do |column|
+          result_row[column] = database_row[column]
         end
-    end
-    result.each do |row|
-        puts row
+        test_columns.each do |column|
+          result_row[column] = test_row[column]
+        end
+        result << result_row
       end
+    end
+  
+    result.each do |row|
+      puts row
+    end
   
     result
-    
-   end  
+  end
+  
+    private
 
-   def evaluate_conditions(row)
-        @where_conditions.all? do |condition|
-            eval(condition, binding)
-        end
+  def evaluate_conditions(row)
+    @where_conditions.all? do |condition|
+      column_name = condition[:column_name]
+      criteria = condition[:criteria]
+      row[column_name] == criteria
     end
+  end
+
+  
+
+  def append_data_to_csv
+    CSV.open(@table_name, 'a') do |csv|
+      csv << @insert_data.values
+    end
+
+    #puts 'Data inserted successfully.'
+  end
 end
 
-MySqliteRequest.new.select('Birth_city').from('test.csv').where("row['Player'] == 'Cliff Barker'").run
 
+request = MySqliteRequest.new
+request.select('database.lastname', 'test.Player')
+request.from('database.csv')
+request.join('ID', 'test.csv', 'ID')
 
-MySqliteRequest.insert('database.csv').values('firstname' => "Thomas", 'lastname' => "Anderson", 'age' => 33, 'password' => 'matrix').run()
-
+request.run()
