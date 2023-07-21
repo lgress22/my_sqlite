@@ -7,6 +7,10 @@ class MySqliteRequest
     @conditions = []
     @joins = []
     @order_by = nil
+    @order_direction = 'ASC'
+    @insert_table = nil
+    @insert_data = []
+    @insert_mode = false
   end
 
   def from(table_name)
@@ -35,6 +39,17 @@ class MySqliteRequest
     self
   end
 
+  def insert(table_name)
+    @insert_table = table_name
+    @insert_mode = true
+    self
+  end
+
+  def values(data)
+    @insert_data << data
+    self
+  end
+
 
   def run
     data = read_csv_file(@table_name)
@@ -51,6 +66,11 @@ class MySqliteRequest
     data = apply_conditions(data)
     data = apply_column_selection(data)
     data = apply_order(data)
+
+    if @insert_mode
+      execute_insert
+      @insert_mode = false # Reset insert_mode after executing the insert
+    end
 
     data
   end
@@ -103,19 +123,41 @@ class MySqliteRequest
     sorted_data.reverse! if @order_direction == 'DESC'
 
     sorted_data
+  end
 
+  def execute_insert
+    # Read the original data
+    data = read_csv_file(@insert_table)
+
+    # Append the new rows to the original data
+    @insert_data.each do |row|
+      data << CSV::Row.new(data.headers, row)
+    end
+
+    # Write the updated data back to the CSV file
+    CSV.open(@insert_table, 'wb') do |csv|
+      csv << data.headers
+      data.each do |row|
+        csv << row
+      end
+    end
+
+    @insert_data = [] # Reset insert_data after executing the insert
   end
 end
 
 request = MySqliteRequest.new
+
 request.from('test.csv')
-        .select('Player', 'firstname')
-        .join('ID', 'database.csv', 'ID')
-        .where('Player', 'Curly Armstrong')
-        .where('firstname', 'Thomas')
-        .order('Player', 'ASC')
+       .select('Player', 'firstname')
+       .join('ID', 'database.csv', 'ID')
+       #.where('Player', 'Curly Armstrong')
+       #.order('Player', 'DESC')
 results = request.run
 
 results.each do |row|
   puts row.inspect
 end
+
+# request.insert('database.csv')
+#        .values(['3', 'John', 'Smith', '33', 'Wisconsin'])
