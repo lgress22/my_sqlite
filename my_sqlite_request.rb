@@ -11,6 +11,10 @@ class MySqliteRequest
     @insert_table = nil
     @insert_data = []
     @insert_mode = false
+    @update_table = nil
+    @update_mode = false
+    @update_value = {}
+    p "#{@update_table}"
   end
 
   def from(table_name)
@@ -50,32 +54,18 @@ class MySqliteRequest
     self
   end
 
-
-  def run
-    data = read_csv_file(@table_name)
-
-    @joins.each do |join|
-      column_a = join[:column_a]
-      table_b = join[:table_b]
-      column_b = join[:column_b]
-
-      join_data = read_csv_file(table_b)
-      data = apply_join(data, join_data, column_a, column_b)
-    end
-
-    data = apply_conditions(data)
-    data = apply_column_selection(data)
-    data = apply_order(data)
-
-    if @insert_mode
-      execute_insert
-      @insert_mode = false # Reset insert_mode after executing the insert
-    end
-
-    data
+  def set(column,value)
+    @update_column = column
+    @update_value = value
+    self
   end
 
-  private
+  def update(table_name)
+    #puts "@update_table assigned: #{@update_table}"
+    @update_table = table_name
+    @update_mode = true
+    self
+  end
 
   def read_csv_file(file_name)
     CSV.read(file_name, headers: true)
@@ -144,20 +134,84 @@ class MySqliteRequest
 
     @insert_data = [] # Reset insert_data after executing the insert
   end
+
+  def apply_update(data)
+    puts "Update_table is #{@update_table}"
+    return data unless @update_mode
+
+    puts "Update_table is #{@update_mode}"
+    # Read the original data
+    data = read_csv_file(@update_table)
+    puts "Data is a string #{@update_table}"
+    data.each do |row|
+      row[@update_column.to_s] = @update_value
+    end
+  
+    # Write the updated data back to the CSV file only if data is not empty
+    unless data.empty?
+      CSV.open(@update_table, 'wb') do |csv|
+        csv << data.headers
+        data.each do |row|
+          csv << row
+        end
+      end
+    end
+  
+    data
+  end
+
+  def run
+    data = read_csv_file(@table_name)
+
+    @joins.each do |join|
+      column_a = join[:column_a]
+      table_b = join[:table_b]
+      column_b = join[:column_b]
+
+      join_data = read_csv_file(table_b)
+      data = apply_join(data, join_data, column_a, column_b)
+    end
+    
+    # if @update_mode == true
+        p "#{@update_mode}"
+        data = apply_update(data)
+    #   end
+
+    data = apply_conditions(data)
+    data = apply_column_selection(data)
+    data = apply_order(data)
+    data
+  end
+
+  private
 end
+  
+  
 
 request = MySqliteRequest.new
 
 request.from('test.csv')
        .select('Player', 'firstname')
        .join('ID', 'database.csv', 'ID')
-       #.where('Player', 'Curly Armstrong')
-       #.order('Player', 'DESC')
-results = request.run
+       .where('Player', 'Curly Armstrong')
+       .order('Player', 'DESC')
+  results = request.run
 
-results.each do |row|
-  puts row.inspect
-end
+
 
 # request.insert('database.csv')
 #        .values(['3', 'John', 'Smith', '33', 'Wisconsin'])
+
+# request.update('database.csv')
+#     request.set('firstname', 'John')
+#     .where('ID', '3')
+#     puts "Before apply_update: @update_table=#{request.instance_variable_get(:@update_table)}, @update_mode=#{request.instance_variable_get(:@update_mode)}"
+#     results = request.run
+#     puts "After apply_update: @update_table=#{request.instance_variable_get(:@update_table)}, @update_mode=#{request.instance_variable_get(:@update_mode)}"
+
+
+
+
+results.each do |row|
+    puts row.inspect
+  end
