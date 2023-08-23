@@ -66,7 +66,8 @@ class MySqliteRequest
   end
 
   def read_csv_file(table_name)
-    @csv_files = ['test.csv', 'database.csv']
+    @csv_files = ['test.csv']
+    @csv_files = ['database.csv']
   
     csv_data_combined = [] # Combined data from all CSV files
   
@@ -83,7 +84,6 @@ class MySqliteRequest
     puts "Is this working?"
   
     csv_data_combined.each do |row|
-      puts row.inspect
     end
   end
   
@@ -133,24 +133,30 @@ class MySqliteRequest
     sorted_data
   end
 
-  def apply_insert
-    return if @csv_files.nil? || @csv_files.empty?
+  def apply_insert(table_name)
+    return if table_name.nil?
   
-    @csv_files.each do |csv_file|
-      existing_data = read_csv_file(csv_file)
-      combined_data = existing_data + @insert_data
+    csv_file = "#{table_name}.csv"
+    existing_data = read_csv_file(csv_file)
   
-      CSV.open(csv_file, 'wb') do |csv|
-        csv << combined_data.first.headers
-        combined_data.uniq! # Remove duplicates
-        combined_data.each do |row|
-          csv << row
-        end
+    new_data = @insert_data.reject do |new_row|
+      existing_data.any? { |existing_row| existing_row == new_row }
+    end
+  
+    combined_data = existing_data + new_data
+  
+    CSV.open(csv_file, 'wb') do |csv|
+      csv << combined_data.first.headers
+      combined_data.each do |row|
+        csv << row
       end
     end
   
-    @insert_data = [] # Clear insert data after writing
+    #@insert_data = [] # Clear insert data after writing
   end
+  
+  
+  
   
 
   def apply_update(data)
@@ -166,7 +172,7 @@ class MySqliteRequest
       end
     end
   
-    CSV.open(@table_name, 'wb', headers: data.headers) do |csv|
+    CSV.open(@csv_files, 'wb', headers: data.headers) do |csv|
       csv << data.headers
       data.each { |row| csv << row }
     end  
@@ -175,7 +181,9 @@ class MySqliteRequest
   
   def run
     data = read_csv_file(@table_name)
-  
+    puts "Initial data:"
+    puts data.inspect
+
     @joins.each do |join|
       column_a = join[:column_a]
       table_b = join[:table_b]
@@ -186,12 +194,25 @@ class MySqliteRequest
     end
   
     data = apply_conditions(data)
+    p "After applying conditions"
+    p data.inspect
+
     data = apply_column(data)
+    p "after applying conditions"
+    p data.inspect
+
     data = apply_order(data)
-    apply_insert
+    p "After applying order"
+    p data.inspect
+
+    data = apply_insert(@insert_table) if @insert_mode
+    p "After applying insertion"
+    p data.inspect
     data = apply_update(data)
     
     data
+
+    p data.inspect
   end
   
 
