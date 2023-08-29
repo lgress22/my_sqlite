@@ -66,7 +66,6 @@ class MySqliteRequest
   end
 
   def read_csv_file(table_name)
-    @csv_files = ['test.csv']
     @csv_files = ['database.csv']
   
     csv_data_combined = [] # Combined data from all CSV files
@@ -81,13 +80,16 @@ class MySqliteRequest
       csv_data_combined += csv_data # Combine data from each CSV file
     end
   
-    puts "Is this working?"
+    #puts "Is this working?"
   
     csv_data_combined.each do |row|
     end
   end
   
-
+  def use_file(filename)
+    @current_file = filename
+    self
+  end
 
   def apply_join(data, join_data, column_a, column_b)
     join_data_hash = Hash[join_data.map { |row| [row[column_b.to_s], row] }]
@@ -135,54 +137,66 @@ class MySqliteRequest
 
   def apply_insert(table_name)
     return if table_name.nil?
-  
-    csv_file = "#{table_name}.csv"
+    
+    csv_file = "database.csv"
     existing_data = read_csv_file(csv_file)
-  
+    
+    # Convert existing data to arrays for comparison
+    existing_data_arrays = existing_data.map(&:fields)
+    
     new_data = @insert_data.reject do |new_row|
-      existing_data.any? { |existing_row| existing_row == new_row }
+      existing_data_arrays.any? { |existing_row| existing_row == new_row }
     end
-  
-    combined_data = existing_data + new_data
-  
-    CSV.open(csv_file, 'wb') do |csv|
-      csv << combined_data.first.headers
+    
+    combined_data = new_data
+    
+    # Write combined data to CSV
+    CSV.open(csv_file, 'a') do |csv| # Write headers from existing data
       combined_data.each do |row|
         csv << row
+
+        # p existing_data
+        # p new_data
+        # p combined_data
       end
     end
+      return existing_data
+    end
   
-    #@insert_data = [] # Clear insert data after writing
-  end
+    def apply_update(data)
+      # return data unless @update_mode
   
+      csv_file = "database.csv"
+      existing_data = read_csv_file(csv_file)
   
+      data.each do |row|
+        existing_row = existing_data.find { |existing_row| existing_row['ID'] == row['id'].to_s }
   
-  
-
-  def apply_update(data)
-    return unless @update_mode
-  
-    data_by_col = data.by_col # Convert data into columns
-  
-    data.each_with_index do |row, index|
-      if row[@conditions[0][:column]] == @conditions[0][:value]
-        @update_data.each do |column, value|
-          data_by_col[column][index] = value
+        if existing_row
+          @update_data.each do |column, value|
+            existing_row[column] = value
+          end
         end
       end
+  
+      CSV.open(csv_file, 'w') do |csv|
+        csv << existing_data
+  
+        existing_data.each do |row|
+          csv << row.fields
+        end
+      end
+  
+      existing_data
     end
   
-    CSV.open(@csv_files, 'wb', headers: data.headers) do |csv|
-      csv << data.headers
-      data.each { |row| csv << row }
-    end  
-  end
+  
   
   
   def run
-    data = read_csv_file(@table_name)
-    puts "Initial data:"
-    puts data.inspect
+    data = read_csv_file(@csv_files)
+    # puts "Initial data:"
+    # puts data.inspect
 
     @joins.each do |join|
       column_a = join[:column_a]
@@ -193,26 +207,26 @@ class MySqliteRequest
       data = apply_join(data, join_data, column_a, column_b)
     end
   
-    data = apply_conditions(data)
-    p "After applying conditions"
-    p data.inspect
+    # data = apply_conditions(data)
+    # # p "After applying conditions"
+    # # p data.inspect
 
-    data = apply_column(data)
-    p "after applying conditions"
-    p data.inspect
+    # data = apply_column(data)
+    # # p "after applying columns"
+    # # p data.inspect
 
-    data = apply_order(data)
-    p "After applying order"
-    p data.inspect
+    # data = apply_order(data)
+    # # p "After applying order"
+    # # p data.inspect
 
     data = apply_insert(@insert_table) if @insert_mode
-    p "After applying insertion"
-    p data.inspect
+    # p "After applying insertion"
+    # p data.inspect
     data = apply_update(data)
     
-    data
+   data
 
-    p data.inspect
+    #p data.inspect
   end
   
 
@@ -224,28 +238,28 @@ end
 
 request = MySqliteRequest.new
 
-# request.from('test.csv')
-#        .select('Player', 'firstname')
-#        #.join('ID', 'database.csv', 'ID')
-#        #.where('Player', 'Curly Armstrong')
-#        #.order('Player', 'DESC')
+#  request.from('test.csv')
+#         .select('Player', 'firstname')
+# #         .join('ID', 'database.csv', 'ID')
+# #         .where('Player', 'Curly Armstrong')
+# #         .order('Player', 'DESC')
 #   results = request.run
 
   
 
- request.insert('database.csv')
-        .values(['4', 'Jill', 'Pilinsky', '35', 'El Dorado'])
-        results = request.run
+#  request.insert('database.csv')
+#         .values(['4', 'John', 'Pilinsky', '35', 'El Dorado'])
+#         results = request.run
 
-# request.update('database.csv')
-#     request.set('firstname', 'Jim')
-#     .set('lastname', 'Wilson')
-#     .where('ID', '2')
-#      results = request.run('database.csv')
-
-
+request.update('database.csv')
+    request.set('firstname', 'John')
+    .set('lastname', 'Canter')
+    .where('ID', '2')
+     results = request.run
 
 
-     results.each do |row|
-      puts row.inspect
-    end
+
+
+    #  results.each do |row|
+    #   puts row.inspect
+    # end
