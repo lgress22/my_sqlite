@@ -2,7 +2,7 @@ require 'csv'
 
 class MySqliteRequest
   def initialize
-    @table_name = []
+    @table_name = nil
     @columns = []
     @conditions = []
     @joins = []
@@ -72,26 +72,30 @@ class MySqliteRequest
     self
   end
 
-  def read_csv_file(table_name)
-    @csv_files = ['database.csv']
-  
-    csv_data_combined = [] # Combined data from all CSV files
-  
-    @csv_files.each do |csv_file|
-      csv_data = []
-  
-      CSV.foreach(csv_file, headers: true) do |row|
-        csv_data << row
-      end
-  
-      csv_data_combined += csv_data # Combine data from each CSV file
-    end
-  
-    #puts "Is this working?"
-  
-    csv_data_combined.each do |row|
-    end
+  def read_csv_file(file_name)
+    CSV.read(file_name, headers: true)
   end
+
+  # def read_csv_file(table_name)
+  #   @csv_files = ['database.csv']
+  
+  #   csv_data_combined = [] # Combined data from all CSV files
+  
+  #   @csv_files.each do |csv_file|
+  #     csv_data = []
+  
+  #     CSV.foreach(csv_file, headers: true) do |row|
+  #       csv_data << row
+  #     end
+  
+  #     csv_data_combined += csv_data # Combine data from each CSV file
+  #   end
+  
+  #   #puts "Is this working?"
+  
+  #   csv_data_combined.each do |row|
+  #   end
+  # end
    
   def apply_join(data, join_data, column_a, column_b)
     join_data_hash = Hash[join_data.map { |row| [row[column_b.to_s], row] }]
@@ -106,26 +110,24 @@ class MySqliteRequest
 
   def apply_conditions(data)
     return data if @conditions.empty?
-
     @conditions.each do |condition|
       column = condition[:column]
       value = condition[:value]
-
       data = data.select { |row| row[column.to_i] == value }
     end
-
     data
   end
 
-  def apply_column(data)
-    if @columns.empty?
-      data
-    else
-      data.map do |row|
-        row.select { |column, _| @columns.include?(column) }
-      end
+def apply_column(data)
+  if @columns.empty?
+    data
+  else
+    data.map do |row|
+      row.select { |column, _| @columns.include?(column) }
     end
   end
+end
+
 
   def apply_order(data)
     return data unless @order_by
@@ -183,9 +185,9 @@ class MySqliteRequest
           end
         end
       end
-
-      CSV.open(csv_file, 'w') do |csv|
-        csv << existing_data.first.headers   
+      headers = existing_data.first.headers
+      CSV.open(csv_file, 'w',) do |csv|
+        csv << headers  
         existing_data.each do |row|
           csv << row.fields
         end
@@ -194,30 +196,30 @@ class MySqliteRequest
       existing_data
     end
     
-    # def apply_delete(data)
-    #   csv_file = "database.csv"
-    #   existing_data = read_csv_file(csv_file)
+    def apply_delete(data)
+      csv_file = "database.csv"
+      existing_data = read_csv_file(csv_file)
     
-    #   data.each do |row|
-    #     id = row['ID']
-    #     existing_row = existing_data.find { |existing_row| existing_row['ID'] == id.to_s }
+      data.each do |row|
+        id = row['ID']
+        existing_row = existing_data.find { |existing_row| existing_row['ID'] == id.to_s }
     
-    #     if existing_row
-    #       if @conditions.all? { |condition| existing_row[condition[:column]] == condition[:value] }
-    #         existing_data.delete(existing_row)
-    #       end
-    #     end
-    #   end
+        if existing_row
+          if @conditions.all? { |condition| existing_row[condition[:column]] == condition[:value] }
+            existing_data.delete(existing_row)
+          end
+        end
+      end
     
-    #   CSV.open(csv_file, 'w') do |csv|
-    #     csv << existing_data.first    
-    #     existing_data.each do |row|
-    #       csv << row.fields
-    #     end
-    #   end
+      CSV.open(csv_file, 'w') do |csv|
+        csv << existing_data.first    
+        existing_data.each do |row|
+          csv << row.fields
+        end
+      end
     
-    #   existing_data
-    # end
+      existing_data
+    end
          
   def run
     csv_file = "database.csv"
@@ -233,27 +235,39 @@ class MySqliteRequest
       join_data = read_csv_file(table_b)
       data = apply_join(data, join_data, column_a, column_b)
     end
+
+    #data = apply_column_selection(data)
   
-     data = apply_conditions(data)
-    # # p "After applying conditions"
-    # # p data.inspect
+     
+     #p "After applying conditions"
+     #p data.inspect
 
      data = apply_column(data)
-    # # p "after applying columns"
-    # # p data.inspect
+      # p "after applying columns"
+      # p data.inspect
 
-     data = apply_order(data)
-    # # p "After applying order"
-    # # p data.inspect
+       #data = apply_conditions(data)
+      # p data.inspect
 
-    data = apply_insert(data)
-    # p "After applying insertion"
-    # p data.inspect
-    data = apply_update(data)
-    
-    #data = apply_delete(data)
+    #  data = apply_order(data)
+    # # # p "After applying order"
+    # # # p data.inspect
+    if @insert_mode
+      apply_insert(data)
+      @insert_mode = false
+    end
 
-   data
+    if @update_mode
+      apply_update(data)
+      @update_mode = false
+    end
+
+    if @delete_mode
+      apply_delete(data)
+      @delete_mode = false
+    end
+
+   return data
 
     #p data.inspect
   end
@@ -269,26 +283,26 @@ request = MySqliteRequest.new
 
 # This is to run the general query requests.
 
-  request.from('database.csv')
-         .select('firstname')
-#           .join('ID', 'database.csv', 'ID')
-#           .where('firstname', 'Thomas')
-#           .order('firstname', 'DESC')
-    results = request.run
+#   request.from('database.csv')
+#          .select('firstname')
+# #           .join('ID', 'database.csv', 'ID')
+#            .where('firstname', 'Thomas')
+# #           .order('firstname', 'DESC')
+#     results = request.run
 
 #This is to insert new values into the CSV file
 
 #  request.insert('database.csv')
-#         .values(['4', 'John', 'Pilinsky', '35', 'El Dorado'])
+#         .values(['3', 'John', 'Pilinsky', '35', 'El Dorado'])
 #         results = request.run
 
 #This is to update the values in the CSV files
 
-# request.update('database.csv')
-#     request.set('firstname', 'John')
-#      .set('lastname', 'Canter')
-#     .where('ID', '0')
-#      results = request.run
+request.update('database.csv')
+    request.set('firstname', 'John')
+     .set('lastname', 'Canter')
+    .where('ID', '0')
+     results = request.run
  
 #This is to delete values from the CSV files
 
