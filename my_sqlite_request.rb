@@ -14,7 +14,7 @@ class MySqliteRequest
     @update_table = nil
     @update_mode = false
     @update_data = {}
-    @delete_mode = true
+    @delete_mode = false
     @delete_table = nil
   end
 
@@ -67,8 +67,8 @@ class MySqliteRequest
   end
 
   def delete(table_name)
-    @update_table = table_name
-    @update_mode = true
+    @delete_table = table_name
+    @delete_mode = true
     self
   end
 
@@ -175,7 +175,7 @@ end
       data.each do |row|
         id = row['ID']
         existing_row = existing_data.find { |existing_row| existing_row['ID'] == id.to_s }
-    
+
         if existing_row
           # Check if the existing row meets the WHERE condition
           if @conditions.all? { |condition| existing_row[condition[:column]] == condition[:value] }
@@ -185,9 +185,9 @@ end
           end
         end
       end
-      headers = existing_data.first.headers
-      CSV.open(csv_file, 'w',) do |csv|
-        csv << headers  
+
+      CSV.open(csv_file, 'w') do |csv|
+        csv << existing_data.first.headers   
         existing_data.each do |row|
           csv << row.fields
         end
@@ -197,29 +197,48 @@ end
     end
     
     def apply_delete(data)
+      return data unless @delete_mode # Check if delete mode is enabled
+      
       csv_file = "database.csv"
       existing_data = read_csv_file(csv_file)
     
-      data.each do |row|
-        id = row['ID']
-        existing_row = existing_data.find { |existing_row| existing_row['ID'] == id.to_s }
+      deleted_ids = [] # Keep track of deleted IDs
     
-        if existing_row
-          if @conditions.all? { |condition| existing_row[condition[:column]] == condition[:value] }
-            existing_data.delete(existing_row)
-          end
+      existing_data.delete_if do |row|
+        id = row['ID']
+        if @conditions.all? { |condition| row[condition[:column]] == condition[:value] }
+          deleted_ids << id.to_i
+          puts "Deleted row with ID: #{id}"
+          true # Remove the row
+        else
+          false # Keep the row
         end
       end
     
+      # Renumber the ID column for the remaining rows
+      remaining_id = 0 # Start ID numbering from 0
+      existing_data.each do |row|
+        row['ID'] = remaining_id.to_s
+        remaining_id += 1
+      end
+    
+      # Write updated data to CSV
       CSV.open(csv_file, 'w') do |csv|
-        csv << existing_data.first    
+        csv << existing_data.first.headers
         existing_data.each do |row|
           csv << row.fields
         end
       end
     
-      existing_data
+      @delete_mode = false # Disable delete mode after the operation
+    
+      return existing_data
     end
+    
+    
+    
+    
+    
          
   def run
     csv_file = "database.csv"
@@ -262,10 +281,16 @@ end
       @update_mode = false
     end
 
+    p "Before Delete"
+    p data.inspect
+
     if @delete_mode
       apply_delete(data)
       @delete_mode = false
     end
+
+    p "After Delete"
+    p data.inspect
 
    return data
 
@@ -283,34 +308,35 @@ request = MySqliteRequest.new
 
 # This is to run the general query requests.
 
-#   request.from('database.csv')
-#          .select('firstname')
-# #           .join('ID', 'database.csv', 'ID')
-#            .where('firstname', 'Thomas')
-# #           .order('firstname', 'DESC')
-#     results = request.run
+#     request.from('database.csv')
+#            .select('lastname')
+# #             .join('ID', 'database.csv', 'ID')
+#              #.where('firstname', 'Thomas')
+# #             .order('firstname', 'DESC')
+#       results = request.run
 
 #This is to insert new values into the CSV file
 
 #  request.insert('database.csv')
-#         .values(['3', 'John', 'Pilinsky', '35', 'El Dorado'])
+#         .values(['4', 'Jeff', 'Bridges', '75', 'Winchester'])
 #         results = request.run
 
 #This is to update the values in the CSV files
 
-request.update('database.csv')
-    request.set('firstname', 'John')
-     .set('lastname', 'Canter')
-    .where('ID', '0')
-     results = request.run
+# request.update('database.csv')
+#     request.set('firstname', 'John')
+#      .set('lastname', 'Canter')
+#     .where('ID', '0')
+#      results = request.run
  
 #This is to delete values from the CSV files
 
-# request.delete('database.csv')
-#         request.where('ID', '2')
+# request.from('database.csv')
+#         .delete("database.csv")
+#         .where('ID', '2')
 #         results = request.run
 
 
      results.each do |row|
-      puts row.inspect
+      #puts row.inspect
     end
